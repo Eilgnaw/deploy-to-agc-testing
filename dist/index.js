@@ -25884,7 +25884,7 @@ async function run() {
         // 7. Create test version
         core.info('Creating test version...');
         const versionId = await (0, testing_1.createTestVersion)(client, appId, {
-            releaseType,
+            releaseType: 6,
             testType,
             testDesc
         });
@@ -26006,7 +26006,7 @@ async function createTestVersion(client, appId, opts) {
 }
 async function addTestPackage(client, appId, fileName, objectId) {
     const body = {
-        distributeMode: 1,
+        distributeMode: 2,
         file: { fileName, objectId }
     };
     // Publishing API: appId in query

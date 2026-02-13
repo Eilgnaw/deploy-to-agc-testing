@@ -77,7 +77,7 @@ async function run(): Promise<void> {
     // 7. Create test version
     core.info('Creating test version...')
     const versionId = await createTestVersion(client, appId, {
-      releaseType,
+      releaseType: 6,
       testType,
       testDesc
     })
