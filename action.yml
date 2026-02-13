@@ -1,0 +1,67 @@
+name: 'Deploy to AGC Testing'
+description: 'Deploy HarmonyOS app package (.hap/.app) to AppGallery Connect for invite testing'
+author: 'Eilgnaw'
+
+inputs:
+  client-id:
+    description: 'AGC API 客户端 ID'
+    required: true
+  client-secret:
+    description: 'AGC API 客户端密钥'
+    required: true
+  app-id:
+    description: 'AGC 应用 ID'
+    required: true
+  app-path:
+    description: '已签名的软件包文件路径 (.app 或 .hap)'
+    required: true
+  what-to-test-dir:
+    description: '测试内容文件目录路径，目录下放置 WhatToTest.{locale}.txt 文件'
+    required: false
+    default: 'APPTest'
+  language:
+    description: '测试内容使用的语言标识 (如 zh-Hans, en 等)'
+    required: false
+    default: 'zh-Hans'
+  test-desc:
+    description: '测试版本描述（最长50字符），如不填则从 WhatToTest 文件读取'
+    required: false
+  release-type:
+    description: '发布方式 (6=HarmonyOS 测试发布)'
+    required: false
+    default: '6'
+  test-type:
+    description: '测试类型 (3=邀请测试, 4=公开测试)'
+    required: false
+    default: '3'
+  test-group-name:
+    description: '测试群组名称，如不存在会自动创建'
+    required: false
+  generate-invite-code:
+    description: '是否生成邀请码 (true/false)'
+    required: false
+    default: 'false'
+  invite-code-valid-days:
+    description: '邀请码有效天数 (最大30)'
+    required: false
+    default: '7'
+  invite-code-invite-limit:
+    description: '邀请码可邀请人数上限 (最大10000)'
+    required: false
+    default: '1000'
+
+outputs:
+  version-id:
+    description: '创建的测试版本 ID'
+  pkg-version:
+    description: '软件包版本 ID'
+  group-id:
+    description: '测试群组 ID'
+  invitation-code:
+    description: '生成的邀请码'
+  invitation-code-id:
+    description: '邀请码 ID'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
