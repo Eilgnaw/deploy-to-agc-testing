@@ -25842,7 +25842,7 @@ async function run() {
         const whatToTestDir = core.getInput('what-to-test-dir') || 'APPTest';
         const language = core.getInput('language') || 'zh-Hans';
         const testDescInput = core.getInput('test-desc');
-        const releaseType = parseInt(core.getInput('release-type') || '6', 10);
+        const releaseType = parseInt(core.getInput('release-type') || '1', 10);
         const testType = parseInt(core.getInput('test-type') || '3', 10);
         const testGroupName = core.getInput('test-group-name');
         const generateInviteCodeFlag = core.getInput('generate-invite-code') !== 'false';
