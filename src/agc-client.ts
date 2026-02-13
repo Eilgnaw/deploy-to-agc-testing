@@ -17,12 +17,20 @@ export class AGCClient {
       client_secret: clientSecret
     })
 
-    const data = await this.rawRequest<TokenResponse>(
+    const data = await this.rawRequest<TokenResponse & { ret?: { code: number; msg: string } }>(
       'POST',
       `${BASE_URL}/oauth2/v1/token`,
       body,
       { 'Content-Type': 'application/json' }
     )
+
+    if (data.ret) {
+      throw new Error(`Failed to authenticate: ${data.ret.code} ${data.ret.msg}`)
+    }
+    if (!data.access_token) {
+      throw new Error('Failed to authenticate: no access_token in response')
+    }
+
     this.token = data.access_token
     core.setSecret(this.token)
     core.info('Successfully authenticated with AGC')
