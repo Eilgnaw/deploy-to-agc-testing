@@ -85,9 +85,14 @@ export interface GroupInfoItem {
 
 export interface TestTaskInfo {
   groupInfos: GroupInfoItem[]
+  displayArea?: string
+  needShareLink?: number
+  needNotify?: number
 }
 
 export interface OpenTestInfo {
+  startTime: number
+  endTime: number
   testTaskInfo: TestTaskInfo
 }
 
@@ -114,20 +119,22 @@ export interface SubmitTestVersionResponse {
 
 // ============================================================
 // Test Group
+// Note: Testing API (/app-test/v1/) uses rtnCode at top level,
+// NOT the ret: { code, msg } wrapper used by Publishing API.
 // ============================================================
 export interface SimpleGroupInfo {
   groupId: string
   groupName: string
+  addedTestersNum?: number
 }
 
 export interface QueryTestGroupListResponse {
-  ret: ConnectRet
-  list: SimpleGroupInfo[]
-  total: number
+  rtnCode: number
+  groups: SimpleGroupInfo[]
 }
 
 export interface CreateTestGroupResponse {
-  ret: ConnectRet
+  rtnCode: number
   groupId: string
 }
 
@@ -141,7 +148,7 @@ export interface GenerateInviteCodeRequest {
 }
 
 export interface GenerateInviteCodeResponse {
-  ret: ConnectRet
+  rtnCode: number
   invitationCode: string
   invitationCodeId: string
 }

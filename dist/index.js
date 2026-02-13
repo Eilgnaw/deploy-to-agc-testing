@@ -26044,9 +26044,14 @@ async function updateTestVersion(client, appId, opts) {
         pkgId: opts.pkgId
     };
     if (opts.groupId) {
+        const startTime = Date.now();
+        const endTime = startTime + 30 * 24 * 60 * 60 * 1000;
         body.openTestInfo = {
+            startTime,
+            endTime,
             testTaskInfo: {
-                groupInfos: [{ groupId: opts.groupId }]
+                groupInfos: [{ groupId: opts.groupId }],
+                displayArea: '1'
             }
         };
     }
@@ -26071,8 +26076,8 @@ async function submitTestVersion(client, appId, versionId) {
 async function findOrCreateTestGroup(client, appId, groupName) {
     // Query existing groups — testing API uses appId in header
     const listResp = await client.get('/app-test/v1/test-group/list', undefined, { appId });
-    if (listResp.ret.code === 0 && listResp.list) {
-        const existing = listResp.list.find((g) => g.groupName === groupName);
+    if (listResp.rtnCode === 0 && listResp.groups) {
+        const existing = listResp.groups.find((g) => g.groupName === groupName);
         if (existing) {
             core.info(`Found existing test group: ${groupName} (${existing.groupId})`);
             return existing.groupId;
@@ -26080,8 +26085,8 @@ async function findOrCreateTestGroup(client, appId, groupName) {
     }
     // Create new group
     const createResp = await client.post('/app-test/v1/test-group', { groupName }, { appId });
-    if (createResp.ret.code !== 0) {
-        throw new Error(`Failed to create test group: ${createResp.ret.code} ${createResp.ret.msg}`);
+    if (createResp.rtnCode !== 0) {
+        throw new Error(`Failed to create test group: ${createResp.rtnCode}`);
     }
     core.info(`Created test group: ${groupName} (${createResp.groupId})`);
     return createResp.groupId;
@@ -26096,8 +26101,8 @@ async function generateInviteCode(client, appId, groupId, validDays, inviteLimit
         invitationCodeInviteLimit: inviteLimit
     };
     const resp = await client.post('/app-test/v1/invitation-code', body, { appId });
-    if (resp.ret.code !== 0) {
-        throw new Error(`Failed to generate invite code: ${resp.ret.code} ${resp.ret.msg}`);
+    if (resp.rtnCode !== 0) {
+        throw new Error(`Failed to generate invite code: ${resp.rtnCode}`);
     }
     core.info(`Generated invitation code: ${resp.invitationCode}`);
     return {

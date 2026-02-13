@@ -127,9 +127,15 @@ export async function updateTestVersion(
   }
 
   if (opts.groupId) {
+    const startTime = Date.now()
+    const endTime = startTime + 30 * 24 * 60 * 60 * 1000
+
     body.openTestInfo = {
+      startTime,
+      endTime,
       testTaskInfo: {
-        groupInfos: [{ groupId: opts.groupId }]
+        groupInfos: [{ groupId: opts.groupId }],
+        displayArea: '1'
       }
     }
   }
@@ -185,8 +191,8 @@ export async function findOrCreateTestGroup(
     { appId }
   )
 
-  if (listResp.ret.code === 0 && listResp.list) {
-    const existing = listResp.list.find((g) => g.groupName === groupName)
+  if (listResp.rtnCode === 0 && listResp.groups) {
+    const existing = listResp.groups.find((g) => g.groupName === groupName)
     if (existing) {
       core.info(`Found existing test group: ${groupName} (${existing.groupId})`)
       return existing.groupId
@@ -200,8 +206,8 @@ export async function findOrCreateTestGroup(
     { appId }
   )
 
-  if (createResp.ret.code !== 0) {
-    throw new Error(`Failed to create test group: ${createResp.ret.code} ${createResp.ret.msg}`)
+  if (createResp.rtnCode !== 0) {
+    throw new Error(`Failed to create test group: ${createResp.rtnCode}`)
   }
 
   core.info(`Created test group: ${groupName} (${createResp.groupId})`)
@@ -231,8 +237,8 @@ export async function generateInviteCode(
     { appId }
   )
 
-  if (resp.ret.code !== 0) {
-    throw new Error(`Failed to generate invite code: ${resp.ret.code} ${resp.ret.msg}`)
+  if (resp.rtnCode !== 0) {
+    throw new Error(`Failed to generate invite code: ${resp.rtnCode}`)
   }
 
   core.info(`Generated invitation code: ${resp.invitationCode}`)

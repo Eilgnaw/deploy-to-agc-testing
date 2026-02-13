@@ -52,8 +52,13 @@ export interface GroupInfoItem {
 }
 export interface TestTaskInfo {
     groupInfos: GroupInfoItem[];
+    displayArea?: string;
+    needShareLink?: number;
+    needNotify?: number;
 }
 export interface OpenTestInfo {
+    startTime: number;
+    endTime: number;
     testTaskInfo: TestTaskInfo;
 }
 export interface UpdateTestVersionRequest {
@@ -73,14 +78,14 @@ export interface SubmitTestVersionResponse {
 export interface SimpleGroupInfo {
     groupId: string;
     groupName: string;
+    addedTestersNum?: number;
 }
 export interface QueryTestGroupListResponse {
-    ret: ConnectRet;
-    list: SimpleGroupInfo[];
-    total: number;
+    rtnCode: number;
+    groups: SimpleGroupInfo[];
 }
 export interface CreateTestGroupResponse {
-    ret: ConnectRet;
+    rtnCode: number;
     groupId: string;
 }
 export interface GenerateInviteCodeRequest {
@@ -89,7 +94,7 @@ export interface GenerateInviteCodeRequest {
     invitationCodeInviteLimit: number;
 }
 export interface GenerateInviteCodeResponse {
-    ret: ConnectRet;
+    rtnCode: number;
     invitationCode: string;
     invitationCodeId: string;
 }
