@@ -60,16 +60,20 @@ export interface AddTestPackageRequest {
 
 export interface AddTestPackageResponse {
   ret: ConnectRet
-  pkgVersion: string
+  pkgVersion: string[]
 }
 
 // ============================================================
-// Compile Status
+// Compile Status (v3)
 // ============================================================
+export interface PackageState {
+  pkgId: string
+  successStatus: number
+}
+
 export interface CompileStatusResponse {
   ret: ConnectRet
-  successStatus: number
-  pkgId: string
+  pkgStateList: PackageState[]
 }
 
 // ============================================================

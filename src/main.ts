@@ -85,14 +85,14 @@ async function run(): Promise<void> {
 
     // 8. Add test package
     core.info('Adding test package...')
-    const pkgVersion = await addTestPackage(
+    const pkgId = await addTestPackage(
       client, appId, fileName, urlInfo.objectId
     )
-    core.setOutput('pkg-version', pkgVersion)
+    core.setOutput('pkg-version', pkgId)
 
     // 9. Poll compile status
     core.info('Waiting for package compilation...')
-    const pkgId = await pollCompileStatus(client, appId, pkgVersion)
+    await pollCompileStatus(client, appId, pkgId)
 
     // 10. Find or create test group (if configured)
     let groupId: string | undefined

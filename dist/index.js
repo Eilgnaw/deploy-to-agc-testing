@@ -25717,8 +25717,12 @@ class AGCClient {
         const headers = { ...this.defaultHeaders(), ...extraHeaders };
         return this.rawRequest('GET', url, undefined, headers);
     }
-    async post(path, body, extraHeaders) {
-        const url = `${BASE_URL}${path}`;
+    async post(path, body, extraHeaders, query) {
+        let url = `${BASE_URL}${path}`;
+        if (query) {
+            const params = new URLSearchParams(query);
+            url += `?${params.toString()}`;
+        }
         const headers = { ...this.defaultHeaders(), ...extraHeaders };
         const payload = body ? JSON.stringify(body) : undefined;
         return this.rawRequest('POST', url, payload, headers);
@@ -25887,11 +25891,11 @@ async function run() {
         core.setOutput('version-id', versionId);
         // 8. Add test package
         core.info('Adding test package...');
-        const pkgVersion = await (0, testing_1.addTestPackage)(client, appId, fileName, urlInfo.objectId);
-        core.setOutput('pkg-version', pkgVersion);
+        const pkgId = await (0, testing_1.addTestPackage)(client, appId, fileName, urlInfo.objectId);
+        core.setOutput('pkg-version', pkgId);
         // 9. Poll compile status
         core.info('Waiting for package compilation...');
-        const pkgId = await (0, testing_1.pollCompileStatus)(client, appId, pkgVersion);
+        await (0, testing_1.pollCompileStatus)(client, appId, pkgId);
         // 10. Find or create test group (if configured)
         let groupId;
         if (testGroupName) {
@@ -25992,7 +25996,8 @@ async function createTestVersion(client, appId, opts) {
         testDesc: opts.testDesc,
         onshelfSelfDetect: 0
     };
-    const resp = await client.post('/publish/v2/test/app/version', body, { appId });
+    // Publishing API: appId in query
+    const resp = await client.post('/publish/v2/test/app/version', body, undefined, { appId });
     if (resp.ret.code !== 0) {
         throw new Error(`Failed to create test version: ${resp.ret.code} ${resp.ret.msg}`);
     }
@@ -26004,26 +26009,29 @@ async function addTestPackage(client, appId, fileName, objectId) {
         distributeMode: 1,
         file: { fileName, objectId }
     };
-    const resp = await client.post('/publish/v2/test/version/pkg', body, { appId });
+    // Publishing API: appId in query
+    const resp = await client.post('/publish/v2/test/version/pkg', body, undefined, { appId });
     if (resp.ret.code !== 0) {
         throw new Error(`Failed to add test package: ${resp.ret.code} ${resp.ret.msg}`);
     }
-    core.info(`Added test package, pkgVersion: ${resp.pkgVersion}`);
-    return resp.pkgVersion;
+    const pkgId = resp.pkgVersion[0];
+    core.info(`Added test package, pkgId: ${pkgId}`);
+    return pkgId;
 }
 const COMPILE_POLL_INTERVAL_MS = 10_000;
 const COMPILE_POLL_TIMEOUT_MS = 5 * 60_000;
-async function pollCompileStatus(client, appId, pkgVersion) {
+async function pollCompileStatus(client, appId, pkgId) {
     const startTime = Date.now();
     while (Date.now() - startTime < COMPILE_POLL_TIMEOUT_MS) {
-        const resp = await client.get('/publish/v2/app-compile-status', { appId, pkgVersion });
-        core.info(`Compile status: successStatus=${resp.successStatus}`);
-        if (resp.successStatus === 0) {
-            core.info(`Package compiled successfully, pkgId: ${resp.pkgId}`);
-            return resp.pkgId;
-        }
+        const resp = await client.get('/publish/v3/package/compile/status', { appId, pkgIds: pkgId });
         if (resp.ret.code !== 0) {
             throw new Error(`Compile status check failed: ${resp.ret.code} ${resp.ret.msg}`);
+        }
+        const pkg = resp.pkgStateList?.[0];
+        core.info(`Compile status: successStatus=${pkg?.successStatus}`);
+        if (pkg && pkg.successStatus === 0) {
+            core.info('Package compiled successfully');
+            return;
         }
         core.info(`Waiting for package compilation... (${Math.round((Date.now() - startTime) / 1000)}s elapsed)`);
         await sleep(COMPILE_POLL_INTERVAL_MS);
@@ -26050,7 +26058,8 @@ async function updateTestVersion(client, appId, opts) {
 }
 async function submitTestVersion(client, appId, versionId) {
     const body = { versionId };
-    const resp = await client.post('/publish/v2/test/app/version/submit', body, { appId });
+    // Publishing API: appId in query
+    const resp = await client.post('/publish/v2/test/app/version/submit', body, undefined, { appId });
     if (resp.ret.code !== 0) {
         throw new Error(`Failed to submit test version: ${resp.ret.code} ${resp.ret.msg}`);
     }
@@ -26180,12 +26189,20 @@ async function uploadFile(urlInfo, filePath) {
     const fileBuffer = fs.readFileSync(filePath);
     return new Promise((resolve, reject) => {
         const parsed = new URL(urlInfo.url);
+        // Only use headers from urlInfo — the URL is pre-signed and the signature
+        // covers exactly these headers. Extra or missing headers will break the signature.
+        const headers = {};
+        for (const [key, value] of Object.entries(urlInfo.headers)) {
+            headers[key.toLowerCase()] = value;
+        }
+        // Ensure content-length matches the actual file size
+        headers['content-length'] = String(fileBuffer.length);
         const options = {
             hostname: parsed.hostname,
             port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
             path: parsed.pathname + parsed.search,
             method: urlInfo.method || 'PUT',
-            headers: { ...urlInfo.headers }
+            headers
         };
         const proto = parsed.protocol === 'https:' ? https : http;
         const req = proto.request(options, (res) => {
@@ -26204,8 +26221,7 @@ async function uploadFile(urlInfo, filePath) {
             });
         });
         req.on('error', reject);
-        req.write(fileBuffer);
-        req.end();
+        req.end(fileBuffer);
     });
 }
 

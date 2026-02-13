@@ -51,12 +51,22 @@ export async function uploadFile(
 
   return new Promise<void>((resolve, reject) => {
     const parsed = new URL(urlInfo.url)
+
+    // Only use headers from urlInfo — the URL is pre-signed and the signature
+    // covers exactly these headers. Extra or missing headers will break the signature.
+    const headers: Record<string, string> = {}
+    for (const [key, value] of Object.entries(urlInfo.headers)) {
+      headers[key.toLowerCase()] = value
+    }
+    // Ensure content-length matches the actual file size
+    headers['content-length'] = String(fileBuffer.length)
+
     const options: https.RequestOptions = {
       hostname: parsed.hostname,
       port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
       path: parsed.pathname + parsed.search,
       method: urlInfo.method || 'PUT',
-      headers: { ...urlInfo.headers }
+      headers
     }
 
     const proto = parsed.protocol === 'https:' ? https : http
@@ -76,7 +86,6 @@ export async function uploadFile(
     })
 
     req.on('error', reject)
-    req.write(fileBuffer)
-    req.end()
+    req.end(fileBuffer)
   })
 }

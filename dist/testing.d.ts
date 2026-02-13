@@ -6,7 +6,7 @@ export declare function createTestVersion(client: AGCClient, appId: string, opts
     testDesc: string;
 }): Promise<string>;
 export declare function addTestPackage(client: AGCClient, appId: string, fileName: string, objectId: string): Promise<string>;
-export declare function pollCompileStatus(client: AGCClient, appId: string, pkgVersion: string): Promise<string>;
+export declare function pollCompileStatus(client: AGCClient, appId: string, pkgId: string): Promise<void>;
 export declare function updateTestVersion(client: AGCClient, appId: string, opts: {
     versionId: string;
     pkgId: string;

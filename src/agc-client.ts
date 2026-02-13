@@ -53,9 +53,14 @@ export class AGCClient {
   async post<T>(
     path: string,
     body?: unknown,
-    extraHeaders?: Record<string, string>
+    extraHeaders?: Record<string, string>,
+    query?: Record<string, string>
   ): Promise<T> {
-    const url = `${BASE_URL}${path}`
+    let url = `${BASE_URL}${path}`
+    if (query) {
+      const params = new URLSearchParams(query)
+      url += `?${params.toString()}`
+    }
     const headers = { ...this.defaultHeaders(), ...extraHeaders }
     const payload = body ? JSON.stringify(body) : undefined
     return this.rawRequest<T>('POST', url, payload, headers)

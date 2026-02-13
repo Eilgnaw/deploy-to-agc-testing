@@ -33,9 +33,11 @@ export async function createTestVersion(
     onshelfSelfDetect: 0
   }
 
+  // Publishing API: appId in query
   const resp = await client.post<CreateTestVersionResponse>(
     '/publish/v2/test/app/version',
     body,
+    undefined,
     { appId }
   )
 
@@ -58,9 +60,11 @@ export async function addTestPackage(
     file: { fileName, objectId }
   }
 
+  // Publishing API: appId in query
   const resp = await client.post<AddTestPackageResponse>(
     '/publish/v2/test/version/pkg',
     body,
+    undefined,
     { appId }
   )
 
@@ -68,8 +72,9 @@ export async function addTestPackage(
     throw new Error(`Failed to add test package: ${resp.ret.code} ${resp.ret.msg}`)
   }
 
-  core.info(`Added test package, pkgVersion: ${resp.pkgVersion}`)
-  return resp.pkgVersion
+  const pkgId = resp.pkgVersion[0]
+  core.info(`Added test package, pkgId: ${pkgId}`)
+  return pkgId
 }
 
 const COMPILE_POLL_INTERVAL_MS = 10_000
@@ -78,25 +83,26 @@ const COMPILE_POLL_TIMEOUT_MS = 5 * 60_000
 export async function pollCompileStatus(
   client: AGCClient,
   appId: string,
-  pkgVersion: string
-): Promise<string> {
+  pkgId: string
+): Promise<void> {
   const startTime = Date.now()
 
   while (Date.now() - startTime < COMPILE_POLL_TIMEOUT_MS) {
     const resp = await client.get<CompileStatusResponse>(
-      '/publish/v2/app-compile-status',
-      { appId, pkgVersion }
+      '/publish/v3/package/compile/status',
+      { appId, pkgIds: pkgId }
     )
-
-    core.info(`Compile status: successStatus=${resp.successStatus}`)
-
-    if (resp.successStatus === 0) {
-      core.info(`Package compiled successfully, pkgId: ${resp.pkgId}`)
-      return resp.pkgId
-    }
 
     if (resp.ret.code !== 0) {
       throw new Error(`Compile status check failed: ${resp.ret.code} ${resp.ret.msg}`)
+    }
+
+    const pkg = resp.pkgStateList?.[0]
+    core.info(`Compile status: successStatus=${pkg?.successStatus}`)
+
+    if (pkg && pkg.successStatus === 0) {
+      core.info('Package compiled successfully')
+      return
     }
 
     core.info(`Waiting for package compilation... (${Math.round((Date.now() - startTime) / 1000)}s elapsed)`)
@@ -148,9 +154,11 @@ export async function submitTestVersion(
 ): Promise<void> {
   const body: SubmitTestVersionRequest = { versionId }
 
+  // Publishing API: appId in query
   const resp = await client.post<SubmitTestVersionResponse>(
     '/publish/v2/test/app/version/submit',
     body,
+    undefined,
     { appId }
   )
 

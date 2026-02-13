@@ -37,12 +37,15 @@ export interface AddTestPackageRequest {
 }
 export interface AddTestPackageResponse {
     ret: ConnectRet;
-    pkgVersion: string;
+    pkgVersion: string[];
+}
+export interface PackageState {
+    pkgId: string;
+    successStatus: number;
 }
 export interface CompileStatusResponse {
     ret: ConnectRet;
-    successStatus: number;
-    pkgId: string;
+    pkgStateList: PackageState[];
 }
 export interface GroupInfoItem {
     groupId: string;
