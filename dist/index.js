@@ -25684,6 +25684,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.AGCClient = void 0;
 const core = __importStar(__nccwpck_require__(7484));
+const crypto = __importStar(__nccwpck_require__(6982));
 const https = __importStar(__nccwpck_require__(5692));
 const http = __importStar(__nccwpck_require__(8611));
 const BASE_URL = 'https://connect-api.cloud.huawei.com/api';
@@ -25707,6 +25708,14 @@ class AGCClient {
         this.token = data.access_token;
         core.setSecret(this.token);
         core.info('Successfully authenticated with AGC');
+    }
+    async authenticateWithServiceAccount(credentialsJson) {
+        const creds = this.parseServiceAccountCredentials(credentialsJson);
+        const jwt = this.buildJwt(creds);
+        this.token = jwt;
+        this.clientId = creds.sub_account;
+        core.setSecret(this.token);
+        core.info('Successfully authenticated with AGC using service account');
     }
     async get(path, query, extraHeaders) {
         let url = `${BASE_URL}${path}`;
@@ -25736,6 +25745,56 @@ class AGCClient {
         const headers = { ...this.defaultHeaders(), ...extraHeaders };
         const payload = body ? JSON.stringify(body) : undefined;
         return this.rawRequest('PUT', url, payload, headers);
+    }
+    parseServiceAccountCredentials(json) {
+        let creds;
+        try {
+            creds = JSON.parse(json);
+        }
+        catch {
+            throw new Error('Invalid service account JSON: failed to parse');
+        }
+        const required = [
+            'key_id', 'private_key', 'sub_account', 'token_uri'
+        ];
+        for (const field of required) {
+            if (!creds[field]) {
+                throw new Error(`Invalid service account JSON: missing required field "${field}"`);
+            }
+        }
+        return creds;
+    }
+    buildJwt(creds) {
+        const now = Math.floor(Date.now() / 1000);
+        const header = { alg: 'PS256', typ: 'JWT', kid: creds.key_id };
+        const payload = {
+            iss: creds.sub_account,
+            aud: creds.token_uri,
+            iat: now,
+            exp: now + 3600
+        };
+        const encodedHeader = this.base64UrlEncode(JSON.stringify(header));
+        const encodedPayload = this.base64UrlEncode(JSON.stringify(payload));
+        const signingInput = `${encodedHeader}.${encodedPayload}`;
+        const signature = crypto.sign('sha256', Buffer.from(signingInput), {
+            key: creds.private_key,
+            padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
+            saltLength: crypto.constants.RSA_PSS_SALTLEN_DIGEST
+        });
+        return `${signingInput}.${this.base64UrlEncodeBuffer(signature)}`;
+    }
+    base64UrlEncode(str) {
+        return Buffer.from(str, 'utf-8')
+            .toString('base64')
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/, '');
+    }
+    base64UrlEncodeBuffer(buf) {
+        return buf.toString('base64')
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/, '');
     }
     defaultHeaders() {
         return {
@@ -25835,8 +25894,9 @@ const what_to_test_1 = __nccwpck_require__(8700);
 async function run() {
     try {
         // 1. Read action inputs
-        const clientId = core.getInput('client-id', { required: true });
-        const clientSecret = core.getInput('client-secret', { required: true });
+        const serviceAccountJson = core.getInput('service-account-json');
+        const clientId = core.getInput('client-id');
+        const clientSecret = core.getInput('client-secret');
         const appId = core.getInput('app-id', { required: true });
         const appPath = core.getInput('app-path', { required: true });
         const whatToTestDir = core.getInput('what-to-test-dir') || 'APPTest';
@@ -25866,7 +25926,15 @@ async function run() {
         // 3. Authenticate
         core.info('Authenticating with AGC...');
         const client = new agc_client_1.AGCClient();
-        await client.authenticate(clientId, clientSecret);
+        if (serviceAccountJson) {
+            await client.authenticateWithServiceAccount(serviceAccountJson);
+        }
+        else if (clientId && clientSecret) {
+            await client.authenticate(clientId, clientSecret);
+        }
+        else {
+            throw new Error('Authentication credentials required: provide either service-account-json, or both client-id and client-secret');
+        }
         // 4. Compute file SHA256 and get file size
         const fileName = path.basename(resolvedAppPath);
         const fileStats = fs.statSync(resolvedAppPath);
