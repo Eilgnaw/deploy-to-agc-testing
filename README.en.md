@@ -2,7 +2,7 @@
 
 English | [中文](./README.md)
 
-A GitHub Action that uploads HarmonyOS app packages (`.hap` / `.app`) to AppGallery Connect (AGC) and automatically starts invite testing.
+A GitHub Action that uploads HarmonyOS app packages (`.app`) to AppGallery Connect (AGC) and automatically starts invite testing.
 
 Similar to how Xcode Cloud distributes builds to TestFlight in the iOS ecosystem.
 
@@ -22,7 +22,7 @@ Signed package → Upload to AGC → Create test version → Wait for compilatio
   with:
     service-account-json: ${{ secrets.AGC_SERVICE_ACCOUNT_JSON }}
     app-id: ${{ secrets.AGC_APP_ID }}
-    app-path: ./entry/build/default/outputs/default/entry-default-signed.hap
+    app-path: build/outputs/default/MyApp-default-signed.app
 ```
 
 ### Option 2: API Client
@@ -34,7 +34,7 @@ Signed package → Upload to AGC → Create test version → Wait for compilatio
     client-id: ${{ secrets.AGC_CLIENT_ID }}
     client-secret: ${{ secrets.AGC_CLIENT_SECRET }}
     app-id: ${{ secrets.AGC_APP_ID }}
-    app-path: ./entry/build/default/outputs/default/entry-default-signed.hap
+    app-path: build/outputs/default/MyApp-default-signed.app
 ```
 
 ## Full Example
@@ -167,7 +167,7 @@ Create an API client in AGC Console under "Users and Permissions → API Key →
 | Input | Description |
 |-------|-------------|
 | `app-id` | AGC application ID |
-| `app-path` | Path to the signed package file (`.hap` or `.app`) |
+| `app-path` | Path to the signed package file (`.app`) |
 
 ### Optional
 

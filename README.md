@@ -2,7 +2,7 @@
 
 [English](./README.en.md) | 中文
 
-一个 GitHub Action，将 HarmonyOS 应用包（`.hap` / `.app`）上传到 AppGallery Connect (AGC) 并自动发布邀请测试。
+一个 GitHub Action，将 HarmonyOS 应用包（`.app`）上传到 AppGallery Connect (AGC) 并自动发布邀请测试。
 
 类似 iOS 生态中 Xcode Cloud 构建后自动分发到 TestFlight 的流程。
 
@@ -22,7 +22,7 @@
   with:
     service-account-json: ${{ secrets.AGC_SERVICE_ACCOUNT_JSON }}
     app-id: ${{ secrets.AGC_APP_ID }}
-    app-path: ./entry/build/default/outputs/default/entry-default-signed.hap
+    app-path: build/outputs/default/MyApp-default-signed.app
 ```
 
 ### 方式二：API 客户端
@@ -34,7 +34,7 @@
     client-id: ${{ secrets.AGC_CLIENT_ID }}
     client-secret: ${{ secrets.AGC_CLIENT_SECRET }}
     app-id: ${{ secrets.AGC_APP_ID }}
-    app-path: ./entry/build/default/outputs/default/entry-default-signed.hap
+    app-path: build/outputs/default/MyApp-default-signed.app
 ```
 
 ## 完整示例
@@ -167,7 +167,7 @@ jobs:
 | 参数 | 说明 |
 |------|------|
 | `app-id` | AGC 应用 ID |
-| `app-path` | 已签名的软件包路径（`.hap` 或 `.app`） |
+| `app-path` | 已签名的软件包路径（`.app`） |
 
 ### 可选
 
