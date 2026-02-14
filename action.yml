@@ -3,12 +3,15 @@ description: 'Deploy HarmonyOS app package (.hap/.app) to AppGallery Connect for
 author: 'Eilgnaw'
 
 inputs:
+  service-account-json:
+    description: 'Service Account JSON 凭据内容（与 client-id/client-secret 二选一，优先使用）'
+    required: false
   client-id:
-    description: 'AGC API 客户端 ID'
-    required: true
+    description: 'AGC API 客户端 ID（与 service-account-json 二选一）'
+    required: false
   client-secret:
-    description: 'AGC API 客户端密钥'
-    required: true
+    description: 'AGC API 客户端密钥（与 service-account-json 二选一）'
+    required: false
   app-id:
     description: 'AGC 应用 ID'
     required: true

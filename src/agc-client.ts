@@ -1,7 +1,8 @@
 import * as core from '@actions/core'
+import * as crypto from 'crypto'
 import * as https from 'https'
 import * as http from 'http'
-import type { TokenResponse } from './types'
+import type { TokenResponse, ServiceAccountCredentials } from './types'
 
 const BASE_URL = 'https://connect-api.cloud.huawei.com/api'
 
@@ -34,6 +35,16 @@ export class AGCClient {
     this.token = data.access_token
     core.setSecret(this.token)
     core.info('Successfully authenticated with AGC')
+  }
+
+  async authenticateWithServiceAccount(credentialsJson: string): Promise<void> {
+    const creds = this.parseServiceAccountCredentials(credentialsJson)
+    const jwt = this.buildJwt(creds)
+
+    this.token = jwt
+    this.clientId = creds.sub_account
+    core.setSecret(this.token)
+    core.info('Successfully authenticated with AGC using service account')
   }
 
   async get<T>(
@@ -80,6 +91,62 @@ export class AGCClient {
     const headers = { ...this.defaultHeaders(), ...extraHeaders }
     const payload = body ? JSON.stringify(body) : undefined
     return this.rawRequest<T>('PUT', url, payload, headers)
+  }
+
+  private parseServiceAccountCredentials(json: string): ServiceAccountCredentials {
+    let creds: ServiceAccountCredentials
+    try {
+      creds = JSON.parse(json)
+    } catch {
+      throw new Error('Invalid service account JSON: failed to parse')
+    }
+    const required: (keyof ServiceAccountCredentials)[] = [
+      'key_id', 'private_key', 'sub_account', 'token_uri'
+    ]
+    for (const field of required) {
+      if (!creds[field]) {
+        throw new Error(`Invalid service account JSON: missing required field "${field}"`)
+      }
+    }
+    return creds
+  }
+
+  private buildJwt(creds: ServiceAccountCredentials): string {
+    const now = Math.floor(Date.now() / 1000)
+    const header = { alg: 'PS256', typ: 'JWT', kid: creds.key_id }
+    const payload = {
+      iss: creds.sub_account,
+      aud: creds.token_uri,
+      iat: now,
+      exp: now + 3600
+    }
+
+    const encodedHeader = this.base64UrlEncode(JSON.stringify(header))
+    const encodedPayload = this.base64UrlEncode(JSON.stringify(payload))
+    const signingInput = `${encodedHeader}.${encodedPayload}`
+
+    const signature = crypto.sign('sha256', Buffer.from(signingInput), {
+      key: creds.private_key,
+      padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
+      saltLength: crypto.constants.RSA_PSS_SALTLEN_DIGEST
+    })
+
+    return `${signingInput}.${this.base64UrlEncodeBuffer(signature)}`
+  }
+
+  private base64UrlEncode(str: string): string {
+    return Buffer.from(str, 'utf-8')
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '')
+  }
+
+  private base64UrlEncodeBuffer(buf: Buffer): string {
+    return buf.toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '')
   }
 
   private defaultHeaders(): Record<string, string> {

@@ -17,8 +17,9 @@ import { readWhatToTest, truncateTestDesc } from './what-to-test'
 async function run(): Promise<void> {
   try {
     // 1. Read action inputs
-    const clientId = core.getInput('client-id', { required: true })
-    const clientSecret = core.getInput('client-secret', { required: true })
+    const serviceAccountJson = core.getInput('service-account-json')
+    const clientId = core.getInput('client-id')
+    const clientSecret = core.getInput('client-secret')
     const appId = core.getInput('app-id', { required: true })
     const appPath = core.getInput('app-path', { required: true })
     const whatToTestDir = core.getInput('what-to-test-dir') || 'APPTest'
@@ -52,7 +53,15 @@ async function run(): Promise<void> {
     // 3. Authenticate
     core.info('Authenticating with AGC...')
     const client = new AGCClient()
-    await client.authenticate(clientId, clientSecret)
+    if (serviceAccountJson) {
+      await client.authenticateWithServiceAccount(serviceAccountJson)
+    } else if (clientId && clientSecret) {
+      await client.authenticate(clientId, clientSecret)
+    } else {
+      throw new Error(
+        'Authentication credentials required: provide either service-account-json, or both client-id and client-secret'
+      )
+    }
 
     // 4. Compute file SHA256 and get file size
     const fileName = path.basename(resolvedAppPath)

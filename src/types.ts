@@ -157,3 +157,17 @@ export interface InviteCodeResult {
   invitationCode: string
   invitationCodeId: string
 }
+
+// ============================================================
+// Service Account Credentials
+// ============================================================
+export interface ServiceAccountCredentials {
+  project_id: string
+  key_id: string
+  private_key: string
+  sub_account: string
+  token_uri: string
+  auth_uri: string
+  auth_provider_cert_uri: string
+  client_cert_uri: string
+}

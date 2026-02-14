@@ -15,6 +15,19 @@ import * as fs from 'fs'
 
 // ============================================================
 // 使用方法:
+//   方式一：Service Account（推荐）
+//   npx ts-node src/test-local.ts \
+//     --service-account-file /path/to/service-account.json \
+//     --app-id YOUR_APP_ID \
+//     --app-path /path/to/entry-default-signed.hap
+//
+//   方式二：Service Account（直接传 JSON 字符串）
+//   npx ts-node src/test-local.ts \
+//     --service-account-json '{"project_id":"...","key_id":"..."}' \
+//     --app-id YOUR_APP_ID \
+//     --app-path /path/to/entry-default-signed.hap
+//
+//   方式三：Client Credentials（旧方式）
 //   npx ts-node src/test-local.ts \
 //     --client-id YOUR_CLIENT_ID \
 //     --client-secret YOUR_CLIENT_SECRET \
@@ -48,11 +61,24 @@ async function main() {
 
   const clientId = args['client-id']
   const clientSecret = args['client-secret']
+  const serviceAccountFile = args['service-account-file']
+  const serviceAccountJson = args['service-account-json']
   const appId = args['app-id']
   const appPath = args['app-path']
 
-  if (!clientId || !clientSecret || !appId || !appPath) {
-    console.error('Missing required arguments: --client-id, --client-secret, --app-id, --app-path')
+  if (!appId || !appPath) {
+    console.error('Missing required arguments: --app-id, --app-path')
+    process.exit(1)
+  }
+
+  const hasServiceAccount = serviceAccountFile || serviceAccountJson
+  const hasClientCredentials = clientId && clientSecret
+
+  if (!hasServiceAccount && !hasClientCredentials) {
+    console.error(
+      'Authentication required: provide --service-account-file or --service-account-json, ' +
+      'or both --client-id and --client-secret'
+    )
     process.exit(1)
   }
 
@@ -66,7 +92,7 @@ async function main() {
   const genInviteCode = args['generate-invite-code'] === 'true'
   const whatToTestDir = args['what-to-test-dir'] || 'APPTest'
   const language = args['language'] || 'zh-Hans'
-  const releaseType = 6
+  const releaseType = 1
   const testType = 3
 
   // 1. Read WhatToTest
@@ -78,7 +104,19 @@ async function main() {
   // 2. Authenticate
   console.log('\n--- Authenticating ---')
   const client = new AGCClient()
-  await client.authenticate(clientId, clientSecret)
+  if (serviceAccountFile) {
+    const saPath = path.resolve(serviceAccountFile)
+    if (!fs.existsSync(saPath)) {
+      console.error(`Service account file not found: ${saPath}`)
+      process.exit(1)
+    }
+    const saJson = fs.readFileSync(saPath, 'utf-8')
+    await client.authenticateWithServiceAccount(saJson)
+  } else if (serviceAccountJson) {
+    await client.authenticateWithServiceAccount(serviceAccountJson)
+  } else {
+    await client.authenticate(clientId, clientSecret)
+  }
 
   // 3. File info
   const fileName = path.basename(resolvedAppPath)
@@ -99,7 +137,7 @@ async function main() {
 
   // 6. Create test version
   console.log('\n--- Creating test version ---')
-  const versionId = await createTestVersion(client, appId, { releaseType, testType, testDesc })
+  const versionId = await createTestVersion(client, appId, { releaseType: 6, testType, testDesc })
   console.log(`versionId: ${versionId}`)
 
   // 7. Add test package
@@ -107,38 +145,38 @@ async function main() {
   const pkgId = await addTestPackage(client, appId, fileName, uploadUrlResp.urlInfo.objectId)
   console.log(`pkgId: ${pkgId}`)
 
-  // 8. Poll compile status
-  console.log('\n--- Polling compile status ---')
-  await pollCompileStatus(client, appId, pkgId)
+  // // 8. Poll compile status
+  // console.log('\n--- Polling compile status ---')
+  // await pollCompileStatus(client, appId, pkgId)
 
-  // 9. Find or create test group
-  let groupId: string | undefined
-  if (testGroupName) {
-    console.log(`\n--- Finding/creating test group: ${testGroupName} ---`)
-    groupId = await findOrCreateTestGroup(client, appId, testGroupName)
-    console.log(`groupId: ${groupId}`)
-  }
+  // // 9. Find or create test group
+  // let groupId: string | undefined
+  // if (testGroupName) {
+  //   console.log(`\n--- Finding/creating test group: ${testGroupName} ---`)
+  //   groupId = await findOrCreateTestGroup(client, appId, testGroupName)
+  //   console.log(`groupId: ${groupId}`)
+  // }
 
-  // 10. Update test version
-  console.log('\n--- Updating test version ---')
-  await updateTestVersion(client, appId, { versionId, pkgId, groupId })
+  // // 10. Update test version
+  // console.log('\n--- Updating test version ---')
+  // await updateTestVersion(client, appId, { versionId, pkgId, groupId })
 
-  // 11. Submit test version
-  console.log('\n--- Submitting test version ---')
-  await submitTestVersion(client, appId, versionId)
+  // // 11. Submit test version
+  // console.log('\n--- Submitting test version ---')
+  // await submitTestVersion(client, appId, versionId)
 
-  // 12. Generate invite code
-  if (genInviteCode && groupId) {
-    console.log('\n--- Generating invite code ---')
-    const result = await generateInviteCode(client, appId, groupId, 7, 1000)
-    console.log(`invitationCode: ${result.invitationCode}`)
-    console.log(`invitationCodeId: ${result.invitationCodeId}`)
-  }
+  // // 12. Generate invite code
+  // if (genInviteCode && groupId) {
+  //   console.log('\n--- Generating invite code ---')
+  //   const result = await generateInviteCode(client, appId, groupId, 7, 1000)
+  //   console.log(`invitationCode: ${result.invitationCode}`)
+  //   console.log(`invitationCodeId: ${result.invitationCodeId}`)
+  // }
 
   console.log('\n=== Done ===')
-  console.log(`version-id: ${versionId}`)
-  console.log(`pkg-version: ${pkgId}`)
-  if (groupId) console.log(`group-id: ${groupId}`)
+  // console.log(`version-id: ${versionId}`)
+  // console.log(`pkg-version: ${pkgId}`)
+  // if (groupId) console.log(`group-id: ${groupId}`)
 }
 
 main().catch((err) => {

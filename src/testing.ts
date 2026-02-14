@@ -56,7 +56,7 @@ export async function addTestPackage(
   objectId: string
 ): Promise<string> {
   const body: AddTestPackageRequest = {
-    distributeMode: 1,
+    distributeMode: 2,
     file: { fileName, objectId }
   }
 

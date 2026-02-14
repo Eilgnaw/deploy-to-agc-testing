@@ -1,0 +1,97 @@
+name: Build and Deploy to AGC Testing
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'AppScope/app.json5'
+
+env:
+  PRODUCT_NAME: upload
+  APP_UNSIGNED: build/outputs/upload/Umiibo_H-upload-unsigned.app
+  APP_SIGNED: build/outputs/upload/Umiibo_H-upload-signed.app
+  SIGN_TOOL: /opt/harmonyos-tools/command-line-tools/sdk/default/openharmony/toolchains/lib/hap-sign-tool.jar
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check versionCode change
+        id: diff
+        run: |
+          OLD=$(git show HEAD~1:AppScope/app.json5 2>/dev/null | grep -oP '"versionCode"\s*:\s*\K\d+' || echo "")
+          NEW=$(grep -oP '"versionCode"\s*:\s*\K\d+' AppScope/app.json5)
+          echo "old=$OLD new=$NEW"
+          if [ "$OLD" != "$NEW" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-and-deploy:
+    needs: check-version
+    if: needs.check-version.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    container: ghcr.io/eilgnaw/harmony-next-pipeline-docker/harmonyos-ci-image:latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare signing materials
+        run: |
+          mkdir -p signing
+          echo "${{ secrets.SIGNING_CERT }}" | base64 -d > signing/cert.cer
+          echo "${{ secrets.SIGNING_PROFILE }}" | base64 -d > signing/profile.p7b
+          echo "${{ secrets.SIGNING_KEYSTORE }}" | base64 -d > signing/keystore.p12
+
+      - name: Install dependencies
+        run: ohpm install --all
+
+      - name: Build APP (release)
+        run: hvigorw assembleApp --mode project -p product=${{ env.PRODUCT_NAME }} -p buildMode=release --no-daemon
+
+      - name: Debug build outputs
+        run: find build/outputs -type f -name "*.app" -o -name "*.hap" | head -20
+
+      - name: Sign APP
+        run: |
+          java -jar ${{ env.SIGN_TOOL }} sign-app \
+            -keyAlias "${{ secrets.KEY_ALIAS }}" \
+            -keyPwd "${{ secrets.KEY_PWD }}" \
+            -keystoreFile signing/keystore.p12 \
+            -keystorePwd "${{ secrets.KEYSTORE_PWD }}" \
+            -appCertFile signing/cert.cer \
+            -profileFile signing/profile.p7b \
+            -inFile "${{ env.APP_UNSIGNED }}" \
+            -outFile "${{ env.APP_SIGNED }}" \
+            -signAlg SHA256withECDSA \
+            -mode localSign
+
+      - name: Deploy to AGC Testing
+        id: agc
+        uses: Eilgnaw/deploy-to-agc-testing@v1
+        with:
+          service-account-json: ${{ secrets.AGC_SERVICE_ACCOUNT_JSON }}
+          app-id: ${{ secrets.AGC_APP_ID }}
+          app-path: ${{ env.APP_SIGNED }}
+          what-to-test-dir: ./APPTest
+          language: zh-Hans
+          test-group-name: 'UmiiboTest'
+          generate-invite-code: 'false'
+          invite-code-valid-days: '7'
+          invite-code-invite-limit: '100'
+
+      - name: Print Results
+        run: |
+          echo "Version ID:      ${{ steps.agc.outputs.version-id }}"
+          echo "Pkg Version:     ${{ steps.agc.outputs.pkg-version }}"
+          echo "Group ID:        ${{ steps.agc.outputs.group-id }}"
+          echo "Invitation Code: ${{ steps.agc.outputs.invitation-code }}"
