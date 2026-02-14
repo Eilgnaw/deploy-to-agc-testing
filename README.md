@@ -14,9 +14,22 @@
 
 ## 快速开始
 
+### 方式一：Service Account（推荐）
+
 ```yaml
 - name: Deploy to AGC Testing
-  uses: Eilgnaw/deploy-to-agc-testing@v1
+  uses: Eilgnaw/deploy-to-agc-testing@v2
+  with:
+    service-account-json: ${{ secrets.AGC_SERVICE_ACCOUNT_JSON }}
+    app-id: ${{ secrets.AGC_APP_ID }}
+    app-path: ./entry/build/default/outputs/default/entry-default-signed.hap
+```
+
+### 方式二：API 客户端
+
+```yaml
+- name: Deploy to AGC Testing
+  uses: Eilgnaw/deploy-to-agc-testing@v2
   with:
     client-id: ${{ secrets.AGC_CLIENT_ID }}
     client-secret: ${{ secrets.AGC_CLIENT_SECRET }}
@@ -71,10 +84,9 @@ jobs:
 
       - name: Deploy to AGC Testing
         id: agc
-        uses: Eilgnaw/deploy-to-agc-testing@v1
+        uses: Eilgnaw/deploy-to-agc-testing@v2
         with:
-          client-id: ${{ secrets.AGC_CLIENT_ID }}
-          client-secret: ${{ secrets.AGC_CLIENT_SECRET }}
+          service-account-json: ${{ secrets.AGC_SERVICE_ACCOUNT_JSON }}
           app-id: ${{ secrets.AGC_APP_ID }}
           app-path: ${{ steps.sign_hap.outcome == 'success' && env.HAP_SIGNED || env.HAP_UNSIGNED }}
           what-to-test-dir: ./APPTest
@@ -92,14 +104,34 @@ jobs:
           echo "Invitation Code: ${{ steps.agc.outputs.invitation-code }}"
 ```
 
+## 认证方式
+
+支持两种认证方式（二选一，`service-account-json` 优先）：
+
+### Service Account（推荐）
+
+在华为开发者联盟 [API Console](https://developer.huawei.com/consumer/cn/console#/credentials) 创建服务帐号，下载 JSON 密钥文件，将文件内容存为 GitHub Secret。
+
+使用 JWT (PS256) 签名认证，无需管理 client_secret，更安全。
+
+### API 客户端
+
+在 AGC 控制台「用户与访问 → API 密钥 → Connect API」创建 API 客户端，获取 `client-id` 和 `client-secret`。
+
 ## 输入参数
+
+### 认证（二选一）
+
+| 参数 | 说明 |
+|------|------|
+| `service-account-json` | Service Account JSON 凭据内容（推荐） |
+| `client-id` | AGC API 客户端 ID |
+| `client-secret` | AGC API 客户端密钥 |
 
 ### 必填
 
 | 参数 | 说明 |
 |------|------|
-| `client-id` | AGC API 客户端 ID |
-| `client-secret` | AGC API 客户端密钥 |
 | `app-id` | AGC 应用 ID |
 | `app-path` | 已签名的软件包路径（`.hap` 或 `.app`） |
 
@@ -144,9 +176,18 @@ your-app/
 
 在仓库 **Settings → Secrets and variables → Actions** 中添加：
 
+### Service Account 方式
+
 | Secret | 来源 |
 |--------|------|
-| `AGC_CLIENT_ID` | AGC 控制台 → 我的项目 → 项目设置 → 凭据 |
+| `AGC_SERVICE_ACCOUNT_JSON` | [API Console](https://developer.huawei.com/consumer/cn/console#/credentials) → 服务帐号 → 下载 JSON 密钥文件的完整内容 |
+| `AGC_APP_ID` | AGC 控制台 → 我的应用 → 应用信息 |
+
+### API 客户端方式
+
+| Secret | 来源 |
+|--------|------|
+| `AGC_CLIENT_ID` | AGC 控制台 → 用户与访问 → API 密钥 → Connect API |
 | `AGC_CLIENT_SECRET` | 同上 |
 | `AGC_APP_ID` | AGC 控制台 → 我的应用 → 应用信息 |
 
@@ -155,6 +196,7 @@ your-app/
 - [Publishing API](https://developer.huawei.com/consumer/cn/doc/app/agc-help-publish-api-guide-0000002271134665)
 - [Testing API](https://developer.huawei.com/consumer/cn/doc/app/agc-help-test-api-guide-0000002236015562)
 - [Upload Management API](https://developer.huawei.com/consumer/cn/doc/app/agc-help-upload-api-guide-0000002271160549)
+- [Service Account 鉴权](https://developer.huawei.com/consumer/cn/doc/HMSCore-Guides/open-platform-service-account-0000001053509221)
 
 ## License
 

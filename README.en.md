@@ -14,9 +14,22 @@ Signed package → Upload to AGC → Create test version → Wait for compilatio
 
 ## Quick Start
 
+### Option 1: Service Account (Recommended)
+
 ```yaml
 - name: Deploy to AGC Testing
-  uses: Eilgnaw/deploy-to-agc-testing@v1
+  uses: Eilgnaw/deploy-to-agc-testing@v2
+  with:
+    service-account-json: ${{ secrets.AGC_SERVICE_ACCOUNT_JSON }}
+    app-id: ${{ secrets.AGC_APP_ID }}
+    app-path: ./entry/build/default/outputs/default/entry-default-signed.hap
+```
+
+### Option 2: API Client
+
+```yaml
+- name: Deploy to AGC Testing
+  uses: Eilgnaw/deploy-to-agc-testing@v2
   with:
     client-id: ${{ secrets.AGC_CLIENT_ID }}
     client-secret: ${{ secrets.AGC_CLIENT_SECRET }}
@@ -71,10 +84,9 @@ jobs:
 
       - name: Deploy to AGC Testing
         id: agc
-        uses: Eilgnaw/deploy-to-agc-testing@v1
+        uses: Eilgnaw/deploy-to-agc-testing@v2
         with:
-          client-id: ${{ secrets.AGC_CLIENT_ID }}
-          client-secret: ${{ secrets.AGC_CLIENT_SECRET }}
+          service-account-json: ${{ secrets.AGC_SERVICE_ACCOUNT_JSON }}
           app-id: ${{ secrets.AGC_APP_ID }}
           app-path: ${{ steps.sign_hap.outcome == 'success' && env.HAP_SIGNED || env.HAP_UNSIGNED }}
           what-to-test-dir: ./APPTest
@@ -92,14 +104,34 @@ jobs:
           echo "Invitation Code: ${{ steps.agc.outputs.invitation-code }}"
 ```
 
+## Authentication
+
+Two authentication methods are supported (choose one; `service-account-json` takes priority):
+
+### Service Account (Recommended)
+
+Create a service account on Huawei Developer [API Console](https://developer.huawei.com/consumer/en/console#/credentials), download the JSON key file, and store the file contents as a GitHub Secret.
+
+Uses JWT (PS256) signed authentication. No need to manage a client_secret, more secure.
+
+### API Client
+
+Create an API client in AGC Console under "Users and Permissions → API Key → Connect API" to obtain `client-id` and `client-secret`.
+
 ## Inputs
+
+### Authentication (choose one)
+
+| Input | Description |
+|-------|-------------|
+| `service-account-json` | Service Account JSON credentials content (recommended) |
+| `client-id` | AGC API client ID |
+| `client-secret` | AGC API client secret |
 
 ### Required
 
 | Input | Description |
 |-------|-------------|
-| `client-id` | AGC API client ID |
-| `client-secret` | AGC API client secret |
 | `app-id` | AGC application ID |
 | `app-path` | Path to the signed package file (`.hap` or `.app`) |
 
@@ -144,9 +176,18 @@ The file content is used as the test version description (truncated to 50 charac
 
 Add the following in your repository **Settings → Secrets and variables → Actions**:
 
+### Service Account
+
 | Secret | Source |
 |--------|--------|
-| `AGC_CLIENT_ID` | AGC Console → My Projects → Project Settings → Credentials |
+| `AGC_SERVICE_ACCOUNT_JSON` | [API Console](https://developer.huawei.com/consumer/en/console#/credentials) → Service Account → Full contents of the downloaded JSON key file |
+| `AGC_APP_ID` | AGC Console → My Apps → App Information |
+
+### API Client
+
+| Secret | Source |
+|--------|--------|
+| `AGC_CLIENT_ID` | AGC Console → Users and Permissions → API Key → Connect API |
 | `AGC_CLIENT_SECRET` | Same as above |
 | `AGC_APP_ID` | AGC Console → My Apps → App Information |
 
@@ -155,6 +196,7 @@ Add the following in your repository **Settings → Secrets and variables → Ac
 - [Publishing API](https://developer.huawei.com/consumer/en/doc/app/agc-help-publish-api-guide-0000002271134665)
 - [Testing API](https://developer.huawei.com/consumer/en/doc/app/agc-help-test-api-guide-0000002236015562)
 - [Upload Management API](https://developer.huawei.com/consumer/en/doc/app/agc-help-upload-api-guide-0000002271160549)
+- [Service Account Authentication](https://developer.huawei.com/consumer/en/doc/HMSCore-Guides/open-platform-service-account-0000001053509221)
 
 ## License
 
