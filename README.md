@@ -39,46 +39,80 @@
 
 ## 完整示例
 
-配合 HarmonyOS CI 容器镜像，实现从构建到邀请测试的完整流水线：
+配合 HarmonyOS CI 容器镜像，实现从构建到邀请测试的完整流水线。当 `AppScope/app.json5` 中的 `versionCode` 变更时自动触发：
 
 ```yaml
 name: Build and Deploy to AGC Testing
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+    paths:
+      - 'AppScope/app.json5'
 
 env:
-  HAP_UNSIGNED: entry/build/default/outputs/default/entry-default-unsigned.hap
-  HAP_SIGNED: entry/build/default/outputs/default/entry-default-signed.hap
+  PRODUCT_NAME: default
+  APP_UNSIGNED: build/outputs/default/MyApp-default-unsigned.app
+  APP_SIGNED: build/outputs/default/MyApp-default-signed.app
+  SIGN_TOOL: /opt/harmonyos-tools/command-line-tools/sdk/default/openharmony/toolchains/lib/hap-sign-tool.jar
 
 jobs:
-  build-and-deploy:
+  check-version:
     runs-on: ubuntu-latest
-    container: ghcr.io/sanchuanhehe/harmony-next-pipeline-docker/harmonyos-ci-image:v5.0.4
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check versionCode change
+        id: diff
+        run: |
+          OLD=$(git show HEAD~1:AppScope/app.json5 2>/dev/null | grep -oP '"versionCode"\s*:\s*\K\d+' || echo "")
+          NEW=$(grep -oP '"versionCode"\s*:\s*\K\d+' AppScope/app.json5)
+          echo "old=$OLD new=$NEW"
+          if [ "$OLD" != "$NEW" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-and-deploy:
+    needs: check-version
+    if: needs.check-version.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    container: ghcr.io/eilgnaw/harmony-next-pipeline-docker/harmonyos-ci-image:latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Prepare signing materials
+        run: |
+          mkdir -p signing
+          echo "${{ secrets.SIGNING_CERT }}" | base64 -d > signing/cert.cer
+          echo "${{ secrets.SIGNING_PROFILE }}" | base64 -d > signing/profile.p7b
+          echo "${{ secrets.SIGNING_KEYSTORE }}" | base64 -d > signing/keystore.p12
+
       - name: Install dependencies
         run: ohpm install --all
 
-      - name: Build HAP
-        run: hvigorw assembleHap --no-daemon
+      - name: Build APP (release)
+        run: hvigorw assembleApp --mode project -p product=${{ env.PRODUCT_NAME }} -p buildMode=release --no-daemon
 
-      - name: Sign HAP
-        id: sign_hap
+      - name: Sign APP
         run: |
-          java -jar hap-sign-tool.jar sign-app \
+          java -jar ${{ env.SIGN_TOOL }} sign-app \
             -keyAlias "${{ secrets.KEY_ALIAS }}" \
             -keyPwd "${{ secrets.KEY_PWD }}" \
-            -keystoreFile "${{ secrets.KEYSTORE_FILE }}" \
+            -keystoreFile signing/keystore.p12 \
             -keystorePwd "${{ secrets.KEYSTORE_PWD }}" \
-            -appCertFile "${{ secrets.APP_CERT_FILE }}" \
-            -profileFile "${{ secrets.PROFILE_FILE }}" \
-            -inFile "${{ env.HAP_UNSIGNED }}" \
-            -outFile "${{ env.HAP_SIGNED }}" \
+            -appCertFile signing/cert.cer \
+            -profileFile signing/profile.p7b \
+            -inFile "${{ env.APP_UNSIGNED }}" \
+            -outFile "${{ env.APP_SIGNED }}" \
             -signAlg SHA256withECDSA \
             -mode localSign
 
@@ -88,11 +122,11 @@ jobs:
         with:
           service-account-json: ${{ secrets.AGC_SERVICE_ACCOUNT_JSON }}
           app-id: ${{ secrets.AGC_APP_ID }}
-          app-path: ${{ steps.sign_hap.outcome == 'success' && env.HAP_SIGNED || env.HAP_UNSIGNED }}
+          app-path: ${{ env.APP_SIGNED }}
           what-to-test-dir: ./APPTest
           language: zh-Hans
-          test-group-name: 'QA团队'
-          generate-invite-code: 'true'
+          test-group-name: 'TestGroup'
+          generate-invite-code: 'false'
           invite-code-valid-days: '7'
           invite-code-invite-limit: '100'
 
