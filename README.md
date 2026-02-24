@@ -2,6 +2,8 @@
 
 [English](./README.en.md) | 中文
 
+> **⚠️ 重要提示：** 请使用**团队级 API 客户端**进行认证。Service Account 方式目前处于内测阶段，个别接口尚不支持，暂时不建议使用。
+
 一个 GitHub Action，将 HarmonyOS 应用包（`.app`）上传到 AppGallery Connect (AGC) 并自动发布邀请测试。
 
 类似 iOS 生态中 Xcode Cloud 构建后自动分发到 TestFlight 的流程。

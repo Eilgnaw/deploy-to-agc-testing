@@ -2,6 +2,8 @@
 
 English | [中文](./README.md)
 
+> **⚠️ Important:** Please use a **team-level API Client** for authentication. The Service Account method is currently in beta — some APIs are not yet supported, so it is not recommended for now.
+
 A GitHub Action that uploads HarmonyOS app packages (`.app`) to AppGallery Connect (AGC) and automatically starts invite testing.
 
 Similar to how Xcode Cloud distributes builds to TestFlight in the iOS ecosystem.
