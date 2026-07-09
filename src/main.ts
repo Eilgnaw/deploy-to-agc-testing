@@ -12,7 +12,12 @@ import {
   findOrCreateTestGroup,
   generateInviteCode
 } from './testing'
-import { readWhatToTest, truncateTestDesc } from './what-to-test'
+import {
+  readWhatToTest,
+  toAgcLanguage,
+  truncateTestContent,
+  truncateTestDesc
+} from './what-to-test'
 
 async function run(): Promise<void> {
   try {
@@ -45,9 +50,11 @@ async function run(): Promise<void> {
 
     // 2. Read WhatToTest file
     const whatToTest = await readWhatToTest(whatToTestDir, language)
-    const testDesc = testDescInput || truncateTestDesc(whatToTest.content)
-    if (!testDesc) {
-      core.warning('No test description provided and WhatToTest file is empty')
+    const testContent = truncateTestContent(whatToTest.content)
+    const testDesc = truncateTestDesc(testDescInput || '测试版本')
+    const agcLanguage = toAgcLanguage(language)
+    if (!testContent) {
+      core.warning('No test content provided and WhatToTest file is empty; skipping languages.newFeatures update')
     }
 
     // 3. Authenticate
@@ -116,7 +123,10 @@ async function run(): Promise<void> {
     await updateTestVersion(client, appId, {
       versionId,
       pkgId,
-      groupId
+      groupId,
+      testDesc,
+      testContent,
+      agcLanguage
     })
 
     // 12. Submit test version for review

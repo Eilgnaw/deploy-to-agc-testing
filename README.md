@@ -176,8 +176,8 @@ jobs:
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
 | `what-to-test-dir` | `APPTest` | 测试内容文件目录，存放 `WhatToTest.{locale}.txt` |
-| `language` | `zh-Hans` | 测试内容语言标识 |
-| `test-desc` | — | 测试版本描述（最长 50 字符），不填则从 WhatToTest 文件读取 |
+| `language` | `zh-Hans` | 测试内容文件语言标识，上传时自动映射为 AGC 语言码 |
+| `test-desc` | `测试版本` | 测试版本描述（最长 50 字符） |
 | `release-type` | `6` | 发布方式（6 = HarmonyOS 测试发布） |
 | `test-type` | `3` | 测试类型（3 = 邀请测试，4 = 公开测试） |
 | `test-group-name` | — | 测试群组名称，不存在时自动创建 |
@@ -206,7 +206,7 @@ your-app/
     └── WhatToTest.en.txt        # 英文测试说明（可选）
 ```
 
-文件内容会作为测试版本描述（截取前 50 个字符）。也可以通过 `test-desc` 输入参数直接指定，跳过文件读取。
+文件内容会作为测试说明上传到 AGC `languages[].newFeatures`（截取前 1024 个字符）。`test-desc` 仅用于测试版本描述，不会覆盖测试说明。
 
 ## Secrets 配置
 

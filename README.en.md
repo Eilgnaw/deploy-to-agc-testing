@@ -176,8 +176,8 @@ Create an API client in AGC Console under "Users and Permissions → API Key →
 | Input | Default | Description |
 |-------|---------|-------------|
 | `what-to-test-dir` | `APPTest` | Directory containing `WhatToTest.{locale}.txt` files |
-| `language` | `zh-Hans` | Locale identifier for test content |
-| `test-desc` | — | Test version description (max 50 chars). Falls back to WhatToTest file content |
+| `language` | `zh-Hans` | Locale identifier for the test content file. Mapped to an AGC language code when uploaded |
+| `test-desc` | `测试版本` | Test version description (max 50 chars) |
 | `release-type` | `6` | Release type (6 = HarmonyOS test release) |
 | `test-type` | `3` | Test type (3 = invite testing, 4 = public testing) |
 | `test-group-name` | — | Test group name. Created automatically if not found |
@@ -206,7 +206,7 @@ your-app/
     └── WhatToTest.en.txt        # English test notes (optional)
 ```
 
-The file content is used as the test version description (truncated to 50 characters). You can also specify the description directly via the `test-desc` input to skip file reading.
+The file content is uploaded as AGC `languages[].newFeatures` test notes (truncated to 1024 characters). `test-desc` is used only as the test version description and does not replace the test notes.
 
 ## Secrets Setup
 

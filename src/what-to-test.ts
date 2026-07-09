@@ -26,6 +26,23 @@ export async function readWhatToTest(
 }
 
 export function truncateTestDesc(content: string, maxLength = 50): string {
+  return truncateText(content, maxLength)
+}
+
+export function truncateTestContent(content: string, maxLength = 1024): string {
+  return truncateText(content, maxLength)
+}
+
+export function toAgcLanguage(language: string): string {
+  const languageMap: Record<string, string> = {
+    'zh-Hans': 'zh-CN',
+    en: 'en-US'
+  }
+
+  return languageMap[language] || language
+}
+
+function truncateText(content: string, maxLength: number): string {
   if (content.length <= maxLength) {
     return content
   }

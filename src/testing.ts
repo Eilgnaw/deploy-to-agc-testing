@@ -14,7 +14,12 @@ import type {
   CreateTestGroupResponse,
   GenerateInviteCodeRequest,
   GenerateInviteCodeResponse,
-  InviteCodeResult
+  InviteCodeResult,
+  CreateDetectionTaskRequest,
+  CreateDetectionTaskResponse,
+  DetectionTaskReportResponse,
+  CategoryInfo,
+  DetectionExtendField
 } from './types'
 
 // ============================================================
@@ -119,6 +124,9 @@ export async function updateTestVersion(
     versionId: string
     pkgId: string
     groupId?: string
+    testDesc?: string
+    testContent?: string
+    agcLanguage?: string
   }
 ): Promise<void> {
   const body: UpdateTestVersionRequest = {
@@ -126,14 +134,25 @@ export async function updateTestVersion(
     pkgId: opts.pkgId
   }
 
-  if (opts.groupId) {
+  if (opts.testContent) {
+    body.languages = [{
+      language: opts.agcLanguage || 'zh-CN',
+      newFeatures: opts.testContent
+    }]
+  }
+
+  if (opts.groupId || opts.testDesc) {
     const startTime = Date.now()
     const endTime = startTime + 30 * 24 * 60 * 60 * 1000
 
     body.openTestInfo = {
-      startTime,
-      endTime,
-      testTaskInfo: {
+      testDesc: opts.testDesc
+    }
+
+    if (opts.groupId) {
+      body.openTestInfo.startTime = startTime
+      body.openTestInfo.endTime = endTime
+      body.openTestInfo.testTaskInfo = {
         groupInfos: [{ groupId: opts.groupId }],
         displayArea: '1'
       }
@@ -246,6 +265,82 @@ export async function generateInviteCode(
     invitationCode: resp.invitationCode,
     invitationCodeId: resp.invitationCodeId
   }
+}
+
+// ============================================================
+// Detection Task (CI检测)
+// ============================================================
+
+export async function createDetectionTask(
+  client: AGCClient,
+  appId: string,
+  objectId: string,
+  fileName: string,
+  opts?: {
+    categories?: CategoryInfo[]
+    extendField?: DetectionExtendField
+  }
+): Promise<string> {
+  const body: CreateDetectionTaskRequest = {
+    appId,
+    objectId,
+    fileName,
+    source: 'CI_CD_TOOL',
+    categories: opts?.categories,
+    extendField: opts?.extendField
+  }
+
+  const resp = await client.post<CreateDetectionTaskResponse>(
+    '/ci-product/v1/detection/task',
+    body
+  )
+
+  if (resp.ret.code !== 0) {
+    throw new Error(`Failed to create detection task: ${resp.ret.code} ${resp.ret.msg}`)
+  }
+
+  core.info(`Created detection task: ${resp.taskId}`)
+  return resp.taskId
+}
+
+export async function queryDetectionReport(
+  client: AGCClient,
+  taskId: string
+): Promise<DetectionTaskReportResponse> {
+  const resp = await client.get<DetectionTaskReportResponse>(
+    '/ci-product/v1/detection/task/report',
+    { taskId }
+  )
+
+  if (resp.ret.code !== 0) {
+    throw new Error(`Failed to query detection report: ${resp.ret.code} ${resp.ret.msg}`)
+  }
+
+  core.info(`Detection task ${taskId}: status=${resp.status}, result=${resp.result ?? 'N/A'}`)
+  return resp
+}
+
+const DETECTION_POLL_INTERVAL_MS = 30_000
+const DETECTION_POLL_TIMEOUT_MS = 30 * 60_000
+
+export async function pollDetectionResult(
+  client: AGCClient,
+  taskId: string
+): Promise<DetectionTaskReportResponse> {
+  const startTime = Date.now()
+
+  while (Date.now() - startTime < DETECTION_POLL_TIMEOUT_MS) {
+    const report = await queryDetectionReport(client, taskId)
+
+    if (report.status === 'detected' || report.status === 'exception' || report.status === 'timeout') {
+      return report
+    }
+
+    core.info(`Waiting for detection to complete... (${Math.round((Date.now() - startTime) / 1000)}s elapsed)`)
+    await sleep(DETECTION_POLL_INTERVAL_MS)
+  }
+
+  throw new Error('Timed out waiting for detection task to complete')
 }
 
 // ============================================================

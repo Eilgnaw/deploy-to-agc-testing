@@ -23,11 +23,11 @@ inputs:
     required: false
     default: 'APPTest'
   language:
-    description: '测试内容使用的语言标识 (如 zh-Hans, en 等)'
+    description: '测试内容文件使用的语言标识 (如 zh-Hans, en 等)，上传时会映射为 AGC 语言码'
     required: false
     default: 'zh-Hans'
   test-desc:
-    description: '测试版本描述（最长50字符），如不填则从 WhatToTest 文件读取'
+    description: '测试版本描述（最长50字符），如不填则使用“测试版本”'
     required: false
   release-type:
     description: '发布方式 (6=HarmonyOS 测试发布)'

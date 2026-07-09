@@ -25919,9 +25919,11 @@ async function run() {
         }
         // 2. Read WhatToTest file
         const whatToTest = await (0, what_to_test_1.readWhatToTest)(whatToTestDir, language);
-        const testDesc = testDescInput || (0, what_to_test_1.truncateTestDesc)(whatToTest.content);
-        if (!testDesc) {
-            core.warning('No test description provided and WhatToTest file is empty');
+        const testContent = (0, what_to_test_1.truncateTestContent)(whatToTest.content);
+        const testDesc = (0, what_to_test_1.truncateTestDesc)(testDescInput || '测试版本');
+        const agcLanguage = (0, what_to_test_1.toAgcLanguage)(language);
+        if (!testContent) {
+            core.warning('No test content provided and WhatToTest file is empty; skipping languages.newFeatures update');
         }
         // 3. Authenticate
         core.info('Authenticating with AGC...');
@@ -25976,7 +25978,10 @@ async function run() {
         await (0, testing_1.updateTestVersion)(client, appId, {
             versionId,
             pkgId,
-            groupId
+            groupId,
+            testDesc,
+            testContent,
+            agcLanguage
         });
         // 12. Submit test version for review
         core.info('Submitting test version for review...');
@@ -26053,6 +26058,9 @@ exports.updateTestVersion = updateTestVersion;
 exports.submitTestVersion = submitTestVersion;
 exports.findOrCreateTestGroup = findOrCreateTestGroup;
 exports.generateInviteCode = generateInviteCode;
+exports.createDetectionTask = createDetectionTask;
+exports.queryDetectionReport = queryDetectionReport;
+exports.pollDetectionResult = pollDetectionResult;
 const core = __importStar(__nccwpck_require__(7484));
 // ============================================================
 // Test Version lifecycle
@@ -26111,17 +26119,26 @@ async function updateTestVersion(client, appId, opts) {
         versionId: opts.versionId,
         pkgId: opts.pkgId
     };
-    if (opts.groupId) {
+    if (opts.testContent) {
+        body.languages = [{
+                language: opts.agcLanguage || 'zh-CN',
+                newFeatures: opts.testContent
+            }];
+    }
+    if (opts.groupId || opts.testDesc) {
         const startTime = Date.now();
         const endTime = startTime + 30 * 24 * 60 * 60 * 1000;
         body.openTestInfo = {
-            startTime,
-            endTime,
-            testTaskInfo: {
+            testDesc: opts.testDesc
+        };
+        if (opts.groupId) {
+            body.openTestInfo.startTime = startTime;
+            body.openTestInfo.endTime = endTime;
+            body.openTestInfo.testTaskInfo = {
                 groupInfos: [{ groupId: opts.groupId }],
                 displayArea: '1'
-            }
-        };
+            };
+        }
     }
     const resp = await client.put('/publish/v2/test/app/version', body, { appId });
     if (resp.ret.code !== 0) {
@@ -26177,6 +26194,47 @@ async function generateInviteCode(client, appId, groupId, validDays, inviteLimit
         invitationCode: resp.invitationCode,
         invitationCodeId: resp.invitationCodeId
     };
+}
+// ============================================================
+// Detection Task (CI检测)
+// ============================================================
+async function createDetectionTask(client, appId, objectId, fileName, opts) {
+    const body = {
+        appId,
+        objectId,
+        fileName,
+        source: 'CI_CD_TOOL',
+        categories: opts?.categories,
+        extendField: opts?.extendField
+    };
+    const resp = await client.post('/ci-product/v1/detection/task', body);
+    if (resp.ret.code !== 0) {
+        throw new Error(`Failed to create detection task: ${resp.ret.code} ${resp.ret.msg}`);
+    }
+    core.info(`Created detection task: ${resp.taskId}`);
+    return resp.taskId;
+}
+async function queryDetectionReport(client, taskId) {
+    const resp = await client.get('/ci-product/v1/detection/task/report', { taskId });
+    if (resp.ret.code !== 0) {
+        throw new Error(`Failed to query detection report: ${resp.ret.code} ${resp.ret.msg}`);
+    }
+    core.info(`Detection task ${taskId}: status=${resp.status}, result=${resp.result ?? 'N/A'}`);
+    return resp;
+}
+const DETECTION_POLL_INTERVAL_MS = 30_000;
+const DETECTION_POLL_TIMEOUT_MS = 30 * 60_000;
+async function pollDetectionResult(client, taskId) {
+    const startTime = Date.now();
+    while (Date.now() - startTime < DETECTION_POLL_TIMEOUT_MS) {
+        const report = await queryDetectionReport(client, taskId);
+        if (report.status === 'detected' || report.status === 'exception' || report.status === 'timeout') {
+            return report;
+        }
+        core.info(`Waiting for detection to complete... (${Math.round((Date.now() - startTime) / 1000)}s elapsed)`);
+        await sleep(DETECTION_POLL_INTERVAL_MS);
+    }
+    throw new Error('Timed out waiting for detection task to complete');
 }
 // ============================================================
 // Helpers
@@ -26342,6 +26400,8 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.readWhatToTest = readWhatToTest;
 exports.truncateTestDesc = truncateTestDesc;
+exports.truncateTestContent = truncateTestContent;
+exports.toAgcLanguage = toAgcLanguage;
 const core = __importStar(__nccwpck_require__(7484));
 const fs = __importStar(__nccwpck_require__(9896));
 const path = __importStar(__nccwpck_require__(6928));
@@ -26357,6 +26417,19 @@ async function readWhatToTest(dir, language) {
     return { locale: language, content };
 }
 function truncateTestDesc(content, maxLength = 50) {
+    return truncateText(content, maxLength);
+}
+function truncateTestContent(content, maxLength = 1024) {
+    return truncateText(content, maxLength);
+}
+function toAgcLanguage(language) {
+    const languageMap = {
+        'zh-Hans': 'zh-CN',
+        en: 'en-US'
+    };
+    return languageMap[language] || language;
+}
+function truncateText(content, maxLength) {
     if (content.length <= maxLength) {
         return content;
     }

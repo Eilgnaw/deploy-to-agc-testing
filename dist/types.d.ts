@@ -57,13 +57,19 @@ export interface TestTaskInfo {
     needNotify?: number;
 }
 export interface OpenTestInfo {
-    startTime: number;
-    endTime: number;
-    testTaskInfo: TestTaskInfo;
+    startTime?: number;
+    endTime?: number;
+    testDesc?: string;
+    testTaskInfo?: TestTaskInfo;
+}
+export interface AppLanguage {
+    language: string;
+    newFeatures: string;
 }
 export interface UpdateTestVersionRequest {
     versionId: string;
     pkgId: string;
+    languages?: AppLanguage[];
     openTestInfo?: OpenTestInfo;
 }
 export interface UpdateTestVersionResponse {
@@ -101,6 +107,36 @@ export interface GenerateInviteCodeResponse {
 export interface InviteCodeResult {
     invitationCode: string;
     invitationCodeId: string;
+}
+export interface CategoryInfo {
+    category: string;
+}
+export interface DetectionExtendField {
+    testAccount?: string;
+    testAccountPassword?: string;
+}
+export interface CreateDetectionTaskRequest {
+    appId: string;
+    objectId: string;
+    fileName: string;
+    source: string;
+    categories?: CategoryInfo[];
+    extendField?: DetectionExtendField;
+}
+export interface CreateDetectionTaskResponse {
+    ret: ConnectRet;
+    taskId: string;
+}
+export interface DetectionTaskReportResponse {
+    ret: ConnectRet;
+    taskId: string;
+    status: string;
+    result?: string;
+    appId: string;
+    reportUrl?: string;
+    reportDownloadUrl?: string;
+    createTime: string;
+    endTime?: string;
 }
 export interface ServiceAccountCredentials {
     project_id: string;

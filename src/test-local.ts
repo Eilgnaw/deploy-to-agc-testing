@@ -7,9 +7,17 @@ import {
   updateTestVersion,
   submitTestVersion,
   findOrCreateTestGroup,
-  generateInviteCode
+  generateInviteCode,
+  createDetectionTask,
+  pollDetectionResult
 } from './testing'
-import { readWhatToTest, truncateTestDesc } from './what-to-test'
+import {
+  readWhatToTest,
+  toAgcLanguage,
+  truncateTestContent,
+  truncateTestDesc
+} from './what-to-test'
+import type { CategoryInfo } from './types'
 import * as path from 'path'
 import * as fs from 'fs'
 
@@ -37,6 +45,16 @@ import * as fs from 'fs'
 //     [--generate-invite-code] \
 //     [--what-to-test-dir ./APPTest] \
 //     [--language zh-Hans]
+//
+//   检测任务（可与任意认证方式搭配）:
+//   npx ts-node src/test-local.ts \
+//     --service-account-file /path/to/service-account.json \
+//     --app-id YOUR_APP_ID \
+//     --app-path /path/to/entry-default-signed.app \
+//     --detection \
+//     [--detection-categories "COMPATIBILITY,UX,PERFORMANCE,STABILITY,POWER_CONSUMPTION"] \
+//     [--detection-test-account xxx] \
+//     [--detection-test-account-password xxx]
 // ============================================================
 
 function parseArgs(): Record<string, string> {
@@ -95,11 +113,21 @@ async function main() {
   const releaseType = 1
   const testType = 3
 
+  // Detection args
+  const runDetection = args['detection'] === 'true'
+  const detectionCategories = args['detection-categories'] || ''
+  const detectionTestAccount = args['detection-test-account'] || ''
+  const detectionTestAccountPassword = args['detection-test-account-password'] || ''
+
   // 1. Read WhatToTest
   console.log('--- Reading WhatToTest ---')
   const whatToTest = await readWhatToTest(whatToTestDir, language)
-  const testDesc = args['test-desc'] || truncateTestDesc(whatToTest.content) || '测试版本'
+  const testContent = truncateTestContent(whatToTest.content)
+  const testDesc = truncateTestDesc(args['test-desc'] || '测试版本')
+  const agcLanguage = toAgcLanguage(language)
+  console.log(`testContent: ${testContent}`)
   console.log(`testDesc: ${testDesc}`)
+  console.log(`agcLanguage: ${agcLanguage}`)
 
   // 2. Authenticate
   console.log('\n--- Authenticating ---')
@@ -118,48 +146,95 @@ async function main() {
     await client.authenticate(clientId, clientSecret)
   }
 
-  // 3. File info
-  const fileName = path.basename(resolvedAppPath)
-  const fileStats = fs.statSync(resolvedAppPath)
-  console.log(`\n--- File: ${fileName}, size: ${fileStats.size} bytes ---`)
+  // // 3. File info
+  // const fileName = path.basename(resolvedAppPath)
+  // const fileStats = fs.statSync(resolvedAppPath)
+  // console.log(`\n--- File: ${fileName}, size: ${fileStats.size} bytes ---`)
 
-  const sha256 = await computeFileSha256(resolvedAppPath)
-  console.log(`SHA256: ${sha256}`)
+  // const sha256 = await computeFileSha256(resolvedAppPath)
+  // console.log(`SHA256: ${sha256}`)
 
-  // 4. Get upload URL
-  console.log('\n--- Getting upload URL ---')
-  const uploadUrlResp = await getUploadUrl(client, appId, fileName, fileStats.size, sha256, releaseType)
-  console.log(`objectId: ${uploadUrlResp.urlInfo.objectId}`)
+  // // 4. Get upload URL
+  // console.log('\n--- Getting upload URL ---')
+  // const uploadUrlResp = await getUploadUrl(client, appId, fileName, fileStats.size, sha256, releaseType)
+  // console.log(`objectId: ${uploadUrlResp.urlInfo.objectId}`)
 
   // 5. Upload file
-  console.log('\n--- Uploading file ---')
-  await uploadFile(uploadUrlResp.urlInfo, resolvedAppPath)
+  // console.log('\n--- Uploading file ---')
+  // await uploadFile(uploadUrlResp.urlInfo, resolvedAppPath)
 
   // 6. Create test version
-  console.log('\n--- Creating test version ---')
-  const versionId = await createTestVersion(client, appId, { releaseType: 6, testType, testDesc })
-  console.log(`versionId: ${versionId}`)
+  // console.log('\n--- Creating test version ---')
+  // const versionId = await createTestVersion(client, appId, { releaseType: 6, testType, testDesc })
+  // console.log(`versionId: ${versionId}`)
 
   // 7. Add test package
-  console.log('\n--- Adding test package ---')
-  const pkgId = await addTestPackage(client, appId, fileName, uploadUrlResp.urlInfo.objectId)
-  console.log(`pkgId: ${pkgId}`)
+  // console.log('\n--- Adding test package ---')
+  // const pkgId = await addTestPackage(client, appId, fileName, uploadUrlResp.urlInfo.objectId)
+  // console.log(`pkgId: ${pkgId}`)
 
   // // 8. Poll compile status
   // console.log('\n--- Polling compile status ---')
   // await pollCompileStatus(client, appId, pkgId)
 
-  // // 9. Find or create test group
-  // let groupId: string | undefined
-  // if (testGroupName) {
-  //   console.log(`\n--- Finding/creating test group: ${testGroupName} ---`)
-  //   groupId = await findOrCreateTestGroup(client, appId, testGroupName)
-  //   console.log(`groupId: ${groupId}`)
-  // }
+  // 9. Find or create test group
+  let groupId: string | undefined
+  if (testGroupName) {
+    console.log(`\n--- Finding/creating test group: ${testGroupName} ---`)
+    groupId = await findOrCreateTestGroup(client, appId, testGroupName)
+    console.log(`groupId: ${groupId}`)
+  }
+
+  // Detection flow (独立于测试版本流程)
+  if (runDetection) {
+    console.log('\n--- Running detection ---')
+
+    // // Upload file for detection (reuses upload flow)
+    // const fileName = path.basename(resolvedAppPath)
+    // const fileStats = fs.statSync(resolvedAppPath)
+    // console.log(`File: ${fileName}, size: ${fileStats.size} bytes`)
+
+    // const sha256 = await computeFileSha256(resolvedAppPath)
+    // console.log(`SHA256: ${sha256}`)
+
+    // console.log('Getting upload URL...')
+    // const uploadUrlResp = await getUploadUrl(client, appId, fileName, fileStats.size, sha256, releaseType)
+    // const objectId = uploadUrlResp.urlInfo.objectId
+    // console.log(`objectId: ${objectId}`)
+
+    // console.log('Uploading file...')
+    // await uploadFile(uploadUrlResp.urlInfo, resolvedAppPath)
+
+    // // Build categories
+    // const categories: CategoryInfo[] | undefined = detectionCategories
+    //   ? detectionCategories.split(',').map((c) => ({ category: c.trim().toUpperCase() }))
+    //   : undefined
+
+    // // Build extendField
+    // const extendField = detectionTestAccount
+    //   ? { testAccount: detectionTestAccount, testAccountPassword: detectionTestAccountPassword }
+    //   : undefined
+
+    // console.log('Creating detection task...')
+    // const taskId = await createDetectionTask(client, appId, objectId, fileName, {
+    //   categories,
+    //   extendField
+    // })
+    // console.log(`taskId: ${taskId}`)
+
+    console.log('Polling detection result...')
+    const report = await pollDetectionResult(client, "461323198766422887")
+    console.log(`\n=== Detection Result ===`)
+    console.log(`status: ${report.status}`)
+    console.log(`result: ${report.result ?? 'N/A'}`)
+    if (report.reportUrl) console.log(`reportUrl: ${report.reportUrl}`)
+    if (report.reportDownloadUrl) console.log(`reportDownloadUrl: ${report.reportDownloadUrl}`)
+    if (report.endTime) console.log(`endTime: ${report.endTime}`)
+  }
 
   // // 10. Update test version
   // console.log('\n--- Updating test version ---')
-  // await updateTestVersion(client, appId, { versionId, pkgId, groupId })
+  // await updateTestVersion(client, appId, { versionId, pkgId, groupId, testDesc, testContent, agcLanguage })
 
   // // 11. Submit test version
   // console.log('\n--- Submitting test version ---')
@@ -173,7 +248,7 @@ async function main() {
   //   console.log(`invitationCodeId: ${result.invitationCodeId}`)
   // }
 
-  console.log('\n=== Done ===')
+  // console.log('\n=== Done ===')
   // console.log(`version-id: ${versionId}`)
   // console.log(`pkg-version: ${pkgId}`)
   // if (groupId) console.log(`group-id: ${groupId}`)
